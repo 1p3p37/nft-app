@@ -6,7 +6,7 @@ from tortoise.models import Model
 from datetime import datetime
 
 
-class Tokens(Model):
+class Token(Model):
     id = fields.IntField(pk=True, index=True)
     unique_hash = fields.CharField(max_length=20)
     tx_hash = fields.CharField(max_length=100)
@@ -14,5 +14,5 @@ class Tokens(Model):
     owner = fields.CharField(max_length=100, null=False, unique=True)
 
 
-token_pydantic = pydantic_model_creator(Tokens, name="Token")
-tokenIn_pydantic = pydantic_model_creator(Tokens, name="TokenIn", exclude_readonly=True)
+token_pydantic = pydantic_model_creator(Token, name="Token")
+token_pydanticIn = pydantic_model_creator(Token, name="TokenIn", exclude_readonly=True)
