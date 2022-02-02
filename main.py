@@ -18,6 +18,19 @@ from web3._utils.events import get_event_data
 from tortoise.contrib.fastapi import register_tortoise
 
 
+from web3.middleware import geth_poa_middleware
+
+
+
+
+app = FastAPI()
+#rinkeby
+load_dotenv()
+w3 = Web3(Web3.HTTPProvider(os.getenv('WEB3_INFURA_PROJECT')))
+w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+ABI = os.getenv('ABI')
+MintableNFT = w3.eth.contract(address="0x7abbEc0b2Edf56325F6dA1BE71BC2202001b09e2", abi=ABI)
+
 register_tortoise(
     app,
     db_url='sqlite://database.sqlite3',
@@ -26,14 +39,6 @@ register_tortoise(
     add_exception_handlers=True
 )
 
-app = FastAPI()
-#rinkeby
-load_dotenv()
-w3 = Web3(Web3.HTTPProvider(os.getenv('WEB3_INFURA_PROJECT')))
-ABI = os.getenv('ABI')
-MintableNFT = w3.eth.contract(address="0x7abbEc0b2Edf56325F6dA1BE71BC2202001b09e2", abi=ABI)
-
-
 def random_string():
     letters = string.ascii_letters + string.digits
     rand_string = ''.join(random.choice(letters) for i in range(20))
@@ -41,14 +46,24 @@ def random_string():
 
 
 @app.post('/tokens/create')
-async def create_token(token: token_pydanticIn):
-    token_info = token.dict()
-    token_obj = await Token.create(**token_info)
+async def create_token(Media_url: str = Form(...), Owner: str = Form(...)):
+    token_obj = await Token.create(owner=Owner,  unique_hash=random_string(), media_url=Media_url, tx_hash="None")
     new_token = await token_pydantic.from_tortoise_orm(token_obj)
-    print(token.dict())
+    token_dic = new_token.dict()
+    [token_dic.pop(key) for key in ['id', 'tx_hash']]
+    Mint = MintableNFT.functions.mint(token_dic).buidTrasction()
+    Mint.update({'gas': w3.eth.generate_gas_price()})
+    Mint.update({'nonce': w3.eth.get_transaction_count(os.getenv('ADDRESS'))})
+    signed_tx = w3.eth.account.sign_transaction(Mint, os.getenv('PRIVATE_KEY'))
+    #send the transaction
+    txn_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    txn_receipt = w3.eth.wait_for_transaction_receipt(txn_hash)
+    await Token.filter(owner=new_token.owner).update(tx_hash=txn_receipt)
+
+    #print(token_pydantic.dict())
     return {"status": "ok",
             "data":
-                f"owner: {new_token.owner} media_url: {new_token.media_url}"
+                f"owner: {new_token.owner} media_url: {new_token.media_url}, {new_token.dict()}"
             }
 
 

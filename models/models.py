@@ -7,11 +7,14 @@ from datetime import datetime
 
 
 class Token(Model):
-    id = fields.IntField(pk=True, index=True)
+    id = fields.IntField(pk=True)
     unique_hash = fields.CharField(max_length=20)
     tx_hash = fields.CharField(max_length=100)
     media_url = fields.CharField(max_length=100, null=False, unique=True)
     owner = fields.CharField(max_length=100, null=False, unique=True)
+
+    class PydanticMeta:
+        exclude = ("th_hash",)
 
 
 token_pydantic = pydantic_model_creator(Token, name="Token")
