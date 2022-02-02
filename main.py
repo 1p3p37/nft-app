@@ -49,21 +49,23 @@ def random_string():
 async def create_token(Media_url: str = Form(...), Owner: str = Form(...)):
     token_obj = await Token.create(owner=Owner,  unique_hash=random_string(), media_url=Media_url, tx_hash="None")
     new_token = await token_pydantic.from_tortoise_orm(token_obj)
-    token_dic = new_token.dict()
-    [token_dic.pop(key) for key in ['id', 'tx_hash']]
-    Mint = MintableNFT.functions.mint(token_dic).buidTrasction()
+    Mint = MintableNFT.functions.mint(
+        new_token.owner,
+        new_token.uniqueHash,
+        new_token.mediaURL
+    ).buidTrasction()
     Mint.update({'gas': w3.eth.generate_gas_price()})
     Mint.update({'nonce': w3.eth.get_transaction_count(os.getenv('ADDRESS'))})
     signed_tx = w3.eth.account.sign_transaction(Mint, os.getenv('PRIVATE_KEY'))
     #send the transaction
     txn_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
     txn_receipt = w3.eth.wait_for_transaction_receipt(txn_hash)
-    await Token.filter(owner=new_token.owner).update(tx_hash=txn_receipt)
+    await Token.filter(owner=new_token.id).update(tx_hash=txn_receipt)
 
     #print(token_pydantic.dict())
     return {"status": "ok",
             "data":
-                f"owner: {new_token.owner} media_url: {new_token.media_url}, {new_token.dict()}"
+                f"owner: {new_token.owner} media_url: {new_token.media_url}\nToken successfully created "
             }
 
 
